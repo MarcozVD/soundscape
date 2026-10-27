@@ -1,0 +1,311 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Users & Auth
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String?  @unique
+  passwordHash String?  @map("password_hash")
+  displayName  String   @map("display_name")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  providerAccounts      ProviderAccount[]
+  listenEvents          ListenEvent[]
+  ratings               Rating[]
+  playlists             Playlist[]
+  playlistExports       PlaylistExport[]
+  comments              Comment[]
+  recommendationBatches RecommendationBatch[]
+
+  @@map("users")
+}
+
+// OAuth tokens are stored encrypted (AES-256-GCM) in accessToken / refreshToken fields
+model ProviderAccount {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  provider       String    // 'spotify' | 'apple_music' | 'lastfm' | 'youtube'
+  providerUid    String    @map("provider_uid")
+  accessToken    String    @map("access_token")  // encrypted at rest
+  refreshToken   String?   @map("refresh_token") // encrypted at rest
+  tokenExpiresAt DateTime? @map("token_expires_at")
+  scope          String?
+  rawProfile     Json?     @map("raw_profile")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUid])
+  @@map("provider_accounts")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Music Catalog
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Track {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  isrc        String?  @unique             // International Standard Recording Code
+  title       String
+  durationMs  Int?     @map("duration_ms")
+  explicit    Boolean  @default(false)
+  releaseDate DateTime? @map("release_date") @db.Date
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  providerIds   TrackProviderId[]
+  trackArtists  TrackArtist[]
+  albumTracks   AlbumTrack[]
+  listenEvents  ListenEvent[]
+  ratings       Rating[]
+  playlistItems PlaylistTrack[]
+  recommendations RecommendationTrack[]
+
+  @@map("tracks")
+}
+
+// One track can exist on multiple platforms with different IDs
+model TrackProviderId {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trackId         String  @map("track_id") @db.Uuid
+  provider        String  // 'spotify' | 'apple_music' | 'lastfm' | 'youtube'
+  providerTrackId String  @map("provider_track_id")
+  previewUrl      String? @map("preview_url")  // Spotify 30s preview MP3
+  streamUrl       String? @map("stream_url")   // deep link to platform
+  metadata        Json?                         // raw provider response
+
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerTrackId])
+  @@map("track_provider_ids")
+}
+
+model Artist {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  spotifyId  String?  @unique @map("spotify_id")
+  name       String
+  bio        String?
+  imageUrl   String?  @map("image_url")
+  genres     String[]
+  popularity Int?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  trackArtists TrackArtist[]
+  albumArtists AlbumArtist[]
+
+  @@map("artists")
+}
+
+model TrackArtist {
+  trackId  String @map("track_id") @db.Uuid
+  artistId String @map("artist_id") @db.Uuid
+  role     String @default("main") // 'main' | 'featured'
+
+  track  Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([trackId, artistId])
+  @@map("track_artists")
+}
+
+model Album {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  spotifyId   String?   @unique @map("spotify_id")
+  title       String
+  releaseDate DateTime? @map("release_date") @db.Date
+  albumType   String?   @map("album_type") // 'album' | 'single' | 'ep'
+  coverUrl    String?   @map("cover_url")
+  totalTracks Int?      @map("total_tracks")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  albumArtists AlbumArtist[]
+  albumTracks  AlbumTrack[]
+
+  @@map("albums")
+}
+
+model AlbumArtist {
+  albumId  String @map("album_id") @db.Uuid
+  artistId String @map("artist_id") @db.Uuid
+
+  album  Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([albumId, artistId])
+  @@map("album_artists")
+}
+
+model AlbumTrack {
+  albumId     String @map("album_id") @db.Uuid
+  trackId     String @map("track_id") @db.Uuid
+  trackNumber Int    @map("track_number")
+  discNumber  Int    @default(1) @map("disc_number")
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([albumId, trackId])
+  @@map("album_tracks")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User Activity
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Primary training signal for the ML model
+model ListenEvent {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  trackId        String   @map("track_id") @db.Uuid
+  provider       String?              // source platform
+  listenedAt     DateTime @map("listened_at")
+  playDurationMs Int?     @map("play_duration_ms")
+  source         String?              // 'import' | 'in_app' | 'external'
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id])
+
+  @@index([userId, trackId])
+  @@index([userId, listenedAt(sort: Desc)])
+  @@map("listen_events")
+}
+
+// Explicit feedback — primary signal for model retraining
+model Rating {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  trackId          String   @map("track_id") @db.Uuid
+  stars            Int      // 1–5
+  feedbackText     String?  @map("feedback_text")
+  ratedAt          DateTime @default(now()) @map("rated_at")
+  retrainIngested  Boolean  @default(false) @map("retrain_ingested")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id])
+
+  @@unique([userId, trackId])
+  @@index([retrainIngested])
+  @@map("ratings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Playlists
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Playlist {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  title       String
+  description String?
+  isPublic    Boolean  @default(false) @map("is_public")
+  coverUrl    String?  @map("cover_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks  PlaylistTrack[]
+  exports PlaylistExport[]
+
+  @@map("playlists")
+}
+
+model PlaylistTrack {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  playlistId String   @map("playlist_id") @db.Uuid
+  trackId    String   @map("track_id") @db.Uuid
+  position   Int
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track    Track    @relation(fields: [trackId], references: [id])
+
+  @@unique([playlistId, trackId])
+  @@index([playlistId, position])
+  @@map("playlist_tracks")
+}
+
+// Tracks async export status per platform
+model PlaylistExport {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  playlistId         String    @map("playlist_id") @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  provider           String    // 'spotify' | 'apple_music'
+  providerPlaylistId String?   @map("provider_playlist_id")
+  status             String    @default("pending") // 'pending' | 'in_progress' | 'done' | 'failed'
+  errorMessage       String?   @map("error_message")
+  exportedAt         DateTime? @map("exported_at")
+  tracksExported     Int       @default(0) @map("tracks_exported")
+  tracksTotal        Int?      @map("tracks_total")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  playlist Playlist @relation(fields: [playlistId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@map("playlist_exports")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Social
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Comment {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  entityType String    @map("entity_type") // 'track' | 'album' | 'artist'
+  entityId   String    @map("entity_id") @db.Uuid
+  body       String
+  parentId   String?   @map("parent_id") @db.Uuid
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")  // soft delete
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ML Recommendations
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Log of recommendation batches served to users
+model RecommendationBatch {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  generatedAt     DateTime @default(now()) @map("generated_at")
+  modelVersion    String   @map("model_version")
+  featureSnapshot Json?    @map("feature_snapshot") // snapshot of user vector at generation time
+
+  user   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks RecommendationTrack[]
+
+  @@index([userId, generatedAt(sort: Desc)])
+  @@map("recommendation_batches")
+}
+
+model RecommendationTrack {
+  batchId  String  @map("batch_id") @db.Uuid
+  trackId  String  @map("track_id") @db.Uuid
+  score    Float
+  position Int
+
+  batch RecommendationBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  track Track               @relation(fields: [trackId], references: [id])
+
+  @@id([batchId, trackId])
+  @@map("recommendation_tracks")
+}

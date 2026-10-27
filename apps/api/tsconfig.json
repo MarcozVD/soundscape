@@ -1,0 +1,12 @@
+{
+  "extends": "../../packages/config/tsconfig.node.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "declaration": false,
+    "declarationMap": false,
+    "paths": {
+      "@soundscape/*": ["../../packages/*/src"]
+    }
+  },
+  "include": ["src", "../../packages/db/src", "../../packages/auth/src", "../../packages/types/src", "../../packages/music-providers/src"]
+}

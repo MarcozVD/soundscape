@@ -1,0 +1,18 @@
+{
+  "name": "@soundscape/music-providers",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@soundscape/types": "workspace:*",
+    "@soundscape/auth": "workspace:*",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@soundscape/config": "workspace:*",
+    "@types/jsonwebtoken": "^9.0.7",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,141 @@
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ScrollView,
+} from 'react-native';
+import { useState } from 'react';
+import { useRouter, Link } from 'expo-router';
+import { trpc } from '../../lib/trpc';
+import { useAuthStore } from '../../store/auth';
+
+export default function RegisterScreen() {
+  const router = useRouter();
+  const { setTokens } = useAuthStore();
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: async (data) => {
+      await setTokens(data.accessToken, data.refreshToken);
+      router.replace('/(tabs)/discover');
+    },
+    onError: (err) => {
+      Alert.alert('Registration failed', err.message);
+    },
+  });
+
+  const handleRegister = () => {
+    if (!displayName.trim() || !email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters');
+      return;
+    }
+    registerMutation.mutate({ displayName: displayName.trim(), email: email.trim(), password });
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <Text style={styles.logoText}>◎</Text>
+          <Text style={styles.title}>Create account</Text>
+          <Text style={styles.subtitle}>Join Soundscape today</Text>
+        </View>
+
+        <View style={styles.form}>
+          <TextInput
+            style={styles.input}
+            placeholder="Display name"
+            placeholderTextColor="#737373"
+            value={displayName}
+            onChangeText={setDisplayName}
+            autoCapitalize="words"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor="#737373"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Password (min 8 characters)"
+            placeholderTextColor="#737373"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          <Pressable
+            style={[styles.button, registerMutation.isPending && styles.buttonDisabled]}
+            onPress={handleRegister}
+            disabled={registerMutation.isPending}
+          >
+            {registerMutation.isPending ? (
+              <ActivityIndicator color="#0a0a0a" size="small" />
+            ) : (
+              <Text style={styles.buttonText}>Create Account</Text>
+            )}
+          </Pressable>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Already have an account? </Text>
+          <Link href="/auth/login">
+            <Text style={styles.link}>Log in</Text>
+          </Link>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  inner: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, gap: 32, paddingVertical: 48 },
+  header: { alignItems: 'center', gap: 8 },
+  logoText: { color: '#22c55e', fontSize: 48 },
+  title: { color: '#fff', fontSize: 28, fontWeight: '700' },
+  subtitle: { color: '#737373', fontSize: 14 },
+  form: { gap: 12 },
+  input: {
+    backgroundColor: '#171717',
+    borderWidth: 1,
+    borderColor: '#262626',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: '#fff',
+    fontSize: 15,
+  },
+  button: {
+    backgroundColor: '#22c55e',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: '#0a0a0a', fontWeight: '700', fontSize: 16 },
+  footer: { flexDirection: 'row', justifyContent: 'center' },
+  footerText: { color: '#737373', fontSize: 14 },
+  link: { color: '#22c55e', fontSize: 14, fontWeight: '600' },
+});

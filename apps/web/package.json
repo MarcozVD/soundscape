@@ -1,0 +1,38 @@
+{
+  "name": "@soundscape/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "@soundscape/api-client": "workspace:*",
+    "@soundscape/types": "workspace:*",
+    "@soundscape/ui": "workspace:*",
+    "@tanstack/react-query": "^5.62.15",
+    "@trpc/client": "^11.0.0",
+    "@trpc/react-query": "^11.0.0",
+    "autoprefixer": "^10.4.20",
+    "clsx": "^2.1.1",
+    "gsap": "^3.15.0",
+    "next": "^15.1.0",
+    "postcss": "^8.4.49",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss": "^3.4.17",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@soundscape/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "typescript": "^5.7.2"
+  }
+}

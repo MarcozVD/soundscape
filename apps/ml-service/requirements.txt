@@ -1,0 +1,29 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+
+# Redis
+redis==5.2.1
+
+# ML / Recommendations
+implicit==0.7.2
+scikit-learn==1.6.0
+numpy==2.2.0
+scipy==1.15.0
+pandas==2.2.3
+faiss-cpu==1.9.0.post1
+
+# Scheduling
+apscheduler==3.11.0
+
+# HTTP
+httpx==0.28.1
+
+# Model persistence
+joblib==1.4.2
